@@ -1,0 +1,219 @@
+@extends('admin.layouts.app')
+
+@section('title')
+<title>Others Earnings & Deductions</title>
+@endsection
+
+@section('contents')
+<div class="flex-grow-1">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Others Earnings & Deductions: {{ $employee->name }}</h4>
+            <div class="d-flex align-items-center" style="gap: 8px;">
+                <a href="javascript:void(0)" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#CreateAdvanceApplicationModal" title="Advance Application"><i class="fa-solid fa-plus"></i> Advance Application</a>
+                <a href="javascript:void(0)" class="btn btn-sm ui-act ui-act-create" data-toggle="modal" data-target="#CreateEarningsDeductionModal" title="Add Entry"><i class="fa-solid fa-plus"></i> Add Entry</a>
+                <a href="{{ route('hr-center.employees.index') }}" class="btn btn-sm ui-act ui-act-back" title="Back"><i class="fa-solid fa-arrow-left"></i> Back</a>
+            </div>
+        </div>
+        <div class="card-body">
+
+            <div class="card border mb-3">
+                <div class="card-body py-3">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr><th style="width: 150px;">Employee ID</th><td>: {{ $employee->employee_id ?? '-' }}</td></tr>
+                        <tr><th>Name</th><td>: {{ $employee->name ?? '-' }}</td></tr>
+                        <tr><th>Join Date</th><td>: {{ optional($employee->joining_date)->format('Y-m-d') ?? (is_string($employee->joining_date) ? $employee->joining_date : '-') }}</td></tr>
+                        <tr><th>Department</th><td>: {{ $employeeMeta['department'] ?? '-' }}</td></tr>
+                        <tr><th>Designation</th><td>: {{ $employeeMeta['designation'] ?? '-' }}</td></tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th>Year</th>
+                            <th>Month</th>
+                            <th>Advance/IOU</th>
+                            <th>OT(+/-)</th>
+                            <th>Days</th>
+                            <th>Earnings</th>
+                            <th>Deductions</th>
+                            <th>Remarks</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($rows as $row)
+                            <tr>
+                                <td>{{ data_get($row, 'year') }}</td>
+                                <td>{{ data_get($row, 'month') }}</td>
+                                <td>{{ number_format((float) data_get($row, 'advance_iou', 0), 2) }}</td>
+                                <td>{{ number_format((float) data_get($row, 'ot', 0), 2) }}</td>
+                                <td>{{ number_format((float) data_get($row, 'day', 0), 2) }}</td>
+                                <td>{{ number_format((float) data_get($row, 'earnings', 0), 2) }}</td>
+                                <td>{{ number_format((float) data_get($row, 'deductions', 0), 2) }}</td>
+                                <td>{{ data_get($row, 'remarks') ?: '-' }}</td>
+                                <td>
+                                    <a href="javascript:void(0)" class="btn-custom ui-act ui-act-edit" data-toggle="modal" data-target="#EditEarningsDeductionModal_{{ $loop->index }}" title="Edit"><i class="fa-solid fa-pen-to-square"></i></a>
+                                    <form method="post" action="{{ route('hr-center.employees.earnings.delete', $employee->id) }}" style="display:inline-block" onsubmit="return confirm('Delete this entry?');">
+                                        @csrf
+                                        @method('delete')
+                                        <input type="hidden" name="identifier" value="{{ data_get($row, 'identifier') }}">
+                                        <button type="submit" class="btn-custom ui-act ui-act-delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="9" class="text-center">No data found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+
+            {{-- Saved salary advance application letters: record + print + HR & Accounts approval; they change no figure above. --}}
+            <h6 class="mt-4 mb-2">Advance Applications <small class="text-muted">(print only — not counted in any calculation)</small></h6>
+            <div class="table-responsive">
+                <table class="table table-bordered table-sm">
+                    <thead>
+                        <tr>
+                            <th>Application Date</th>
+                            <th>Amount</th>
+                            <th>Reason</th>
+                            <th>Deduct From</th>
+                            <th>Approval</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($advanceApplications as $application)
+                            <tr>
+                                <td>{{ $application->application_date->format('d M Y') }}</td>
+                                <td>{{ number_format((float) $application->amount, 2) }}</td>
+                                <td>{{ $application->reason ?: '-' }}</td>
+                                <td>{{ $application->deduction_month?->format('F Y') ?? 'Next month' }}</td>
+                                <td>
+                                    @php $approval = ($advanceApprovals ?? collect())->get($application->id); @endphp
+                                    @if($approval)
+                                        <span class="badge {{ ['approved' => 'badge-success', 'rejected' => 'badge-danger', 'cancelled' => 'badge-secondary'][$approval->status] ?? 'badge-warning' }}"
+                                              title="{{ $approval->remarks }}">{{ ucfirst($approval->status) }}</span>
+                                    @else
+                                        -
+                                    @endif
+                                </td>
+                                <td>
+                                    <a href="{{ route('hr-center.employees.advance-applications.print', [$employee->id, $application->id]) }}" target="_blank" class="btn-custom ui-act ui-act-print" title="Print"><i class="fa-solid fa-print"></i></a>
+                                    <form method="post" action="{{ route('hr-center.employees.advance-applications.destroy', [$employee->id, $application->id]) }}" style="display:inline-block" onsubmit="return confirm('Delete this application?');">
+                                        @csrf
+                                        @method('delete')
+                                        <button type="submit" class="btn-custom ui-act ui-act-delete" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="text-center">No advance application yet.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="CreateEarningsDeductionModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form method="post" action="{{ route('hr-center.employees.earnings.store', $employee->id) }}">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Others Earnings & Deductions</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-2"><label class="mb-1">Date</label><input type="date" name="date" value="{{ old('date') }}" class="form-control form-control-sm" required></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Advance/IOU</label><input type="number" step="0.01" name="advance_iou" value="{{ old('advance_iou') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">OT(+/-)</label><input type="number" step="1" name="ot" value="{{ old('ot') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Day(+/-)</label><input type="number" step="1" name="day" value="{{ old('day') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Earnings</label><input type="number" step="0.01" name="earnings" value="{{ old('earnings') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Deductions</label><input type="number" step="0.01" name="deductions" value="{{ old('deductions') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-12 mb-2"><label class="mb-1">Remarks</label><textarea name="remarks" class="form-control form-control-sm" rows="3">{{ old('remarks') }}</textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Save"><i class="fa-solid fa-floppy-disk"></i> Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@foreach($rows as $row)
+<div class="modal fade" id="EditEarningsDeductionModal_{{ $loop->index }}" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form method="post" action="{{ route('hr-center.employees.earnings.update', $employee->id) }}">
+                @csrf
+                @method('put')
+                <input type="hidden" name="identifier" value="{{ data_get($row, 'identifier') }}">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Others Earnings & Deductions</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-2"><label class="mb-1">Date</label><input type="date" name="date" value="{{ data_get($row, 'date') }}" class="form-control form-control-sm" required></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Advance/IOU</label><input type="number" step="0.01" name="advance_iou" value="{{ data_get($row, 'advance_iou') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">OT(+/-)</label><input type="number" step="1" name="ot" value="{{ data_get($row, 'ot') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Day(+/-)</label><input type="number" step="1" name="day" value="{{ data_get($row, 'day') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Earnings</label><input type="number" step="0.01" name="earnings" value="{{ data_get($row, 'earnings') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-6 mb-2"><label class="mb-1">Deductions</label><input type="number" step="0.01" name="deductions" value="{{ data_get($row, 'deductions') }}" class="form-control form-control-sm"></div>
+                        <div class="col-md-12 mb-2"><label class="mb-1">Remarks</label><textarea name="remarks" class="form-control form-control-sm" rows="3">{{ data_get($row, 'remarks') }}</textarea></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                    <button type="submit" class="btn btn-sm ui-act ui-act-save" title="Update"><i class="fa-solid fa-floppy-disk"></i> Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
+<div class="modal fade" id="CreateAdvanceApplicationModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <form method="post" action="{{ route('hr-center.employees.advance-applications.store', $employee->id) }}">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Salary Advance Application (অগ্রিম বেতনের জন্য আবেদন)</h5>
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-2">Saves the application, opens it for printing and mails HR &amp; Accounts for approval. It does not add an advance to Earnings &amp; Deductions or change any salary figure.</p>
+                    <div class="row">
+                        <div class="col-md-3 mb-2"><label class="mb-1">Application Date <span class="text-danger">*</span></label><input type="date" name="application_date" value="{{ old('application_date', now()->toDateString()) }}" class="form-control form-control-sm" required></div>
+                        <div class="col-md-3 mb-2"><label class="mb-1">Amount (Tk) <span class="text-danger">*</span></label><input type="number" step="0.01" min="1" name="amount" value="{{ old('amount') }}" class="form-control form-control-sm" required></div>
+                        <div class="col-md-3 mb-2"><label class="mb-1">Reason</label><input type="text" name="reason" value="{{ old('reason', \ME\Hr\Models\HrAdvanceApplication::DEFAULT_REASON) }}" class="form-control form-control-sm" maxlength="255"></div>
+                        <div class="col-md-3 mb-2"><label class="mb-1">Deduct From (month)</label><input type="month" name="deduction_month" value="{{ old('deduction_month', now()->addMonthNoOverflow()->format('Y-m')) }}" class="form-control form-control-sm"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm ui-act ui-act-cancel" data-dismiss="modal" title="Close"><i class="fa-solid fa-ban"></i> Close</button>
+                    <button type="submit" class="btn btn-sm ui-act ui-act-print" title="Save & Print"><i class="fa-solid fa-print"></i> Save &amp; Print</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection
+
+@push('js')
+<script>
+@if(session('printed_advance_application_id'))
+    window.open('{{ route("hr-center.employees.advance-applications.print", [$employee->id, session("printed_advance_application_id")]) }}', '_blank');
+@endif
+</script>
+@endpush
