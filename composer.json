@@ -1,6 +1,6 @@
 {
     "name": "mestiaque/hr",
-    "description": "HR & Payroll module for Laravel ERP (by M. Estiaque Ahmed Khan)",
+    "description": "HR & Payroll module for Laravel ERP (by Natore-IT)",
     "type": "library",
     "keywords": [
         "laravel",
@@ -11,9 +11,9 @@
     ],
     "authors": [
         {
-            "name": "M. Estiaque Ahmed Khan",
-            "email": "info@mestiaque.com",
-            "homepage": "https://mestiaque.com"
+            "name": "Natore-IT",
+            "email": "info@natoreit.com",
+            "homepage": "https://natoreit.com"
         }
     ],
     "require": {
